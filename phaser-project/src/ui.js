@@ -24,7 +24,7 @@ class TextButton extends Phaser.GameObjects.Text {
   }
 
   hoverState() {
-    this.setStyle({fontSize: '32px', fill : '#FFA500'});
+    this.setStyle({fontSize: '36px', fill : '#FFA500'});
   }
 
   resetState(){
@@ -32,6 +32,6 @@ class TextButton extends Phaser.GameObjects.Text {
   }
 
   activeState(){
-    this.setStyle({fontSize: '32px', fill : '#ffffff'});
+    this.setStyle({fontSize: '38px', fill : '#ffffff'});
   }
 }
