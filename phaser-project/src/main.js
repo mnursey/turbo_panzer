@@ -17,19 +17,16 @@ var config = {
 
 var cursors;
 var controlConfig;
-var score = 0;
-var gameOver = false;
-var scoreText;
-var lifeText;
 var inputs;
 var camera;
 var backgroundImage;
+
 var carController = undefined;
 var roadController = undefined;
-var c;
-var obstacleController;
+var gameController = undefined;
+var obstacleController = undefined;
 
-var life = 3;
+var gameColliders = undefined;
 
 var game = new Phaser.Game(config);
 function preload ()
@@ -40,7 +37,6 @@ function preload ()
     this.load.image('car', 'assets/car_red.png');
     this.load.image('barrel', 'assets/barrel_blue.png');
     this.load.image('barrel_down', 'assets/barrel_blue_down.png');
-
     this.load.image('sky', 'assets/sky.png');
 }
 
@@ -48,14 +44,11 @@ function hitCollider(car, collider) {
 
   if( collider.prevHit === null || collider.prevHit === undefined) {
     collider.y -= carController.forwardSpeed;
-    carController.forwardSpeed = 0.0;
+    carController.forwardSpeed = 1.0;
     collider.setTexture('barrel_down');
     collider.angle = -90;
     collider.prevHit = true;
-    life += -1;
-
-    lifeText.text = "GAME OVER";
-
+    gameController.life += -1;
   } else {
     if(carController.forwardSpeed > 5) {
       carController.forwardSpeed = 5.0;
@@ -88,9 +81,9 @@ function create ()
     // obstacle controller
     obstacleController = new ObstacleController(this);
 
-    c = this.physics.add.collider(carController.car, obstacleController.physicsGroup, hitCollider, null, this);
-    c.overlapOnly = true;
-    console.log(c);
+    gameColliders = this.physics.add.collider(carController.car, obstacleController.physicsGroup, hitCollider, null, this);
+    gameColliders.overlapOnly = true;
+    console.log(gameColliders);
 
     //  Input Events
     cursors = this.input.keyboard.createCursorKeys();
@@ -110,20 +103,8 @@ function create ()
     // Set Background colour
     camera.setBackgroundColor("#003441");
 
-    //  The score
-    scoreText = this.add.text(config.width  - 128 - 16, 16, '0 KM', { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT });
-    scoreText.setDepth(DEPTH_ENUM.UI);
-
-    //  The score
-    let lt = 'X'.repeat(life);
-    lifeText = this.add.text(config.width / 2, 32, lt, { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT, align: 'center'});
-    lifeText.setOrigin﻿(0.5);
-    lifeText.setDepth(DEPTH_ENUM.UI);
-
-    // Add button
-    new TextButton(this, 16 * 3, 16, 'Play', { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT }, function () { console.log("Race");} , DEPTH_ENUM.UI);
-    new TextButton(this, 16 * 3, 48, 'Options', { fontSize: '32px', fill: '#ffffff' }, function () { console.log("Leadboard");} , DEPTH_ENUM.UI);
-    new TextButton(this, 16 * 3, 80, 'Info', { fontSize: '32px', fill: '#ffffff' }, function () { console.log("Options");} , DEPTH_ENUM.UI);
+    // Create game controller
+    gameController = new GameController(this, carController, obstacleController);
 }
 
 function update (time, delta)
@@ -138,9 +119,8 @@ function update (time, delta)
     }
   }
 
-  if (gameOver) {
-    return;
-  }else{
+  if(gameController !== undefined) {
+    gameController.update(delta, time);
 
     if(carController !== undefined) {
       carController.update(delta, time);
@@ -152,12 +132,6 @@ function update (time, delta)
       if (obstacleController !== undefined) {
         obstacleController.update(delta, time, carController.forwardSpeed);
       }
-
-      if (life > 0) {
-        lifeText.text = 'X'.repeat(life);
-      }
-
-      scoreText.text = 4 * carController.forwardSpeed.toFixed(0) + " KM";
     }
   }
 }
@@ -193,10 +167,74 @@ function restrictValue(value, min, max) {
   return value;
 }
 
+class GameController {
+  constructor (scene, carController, obstacleController){
+    this.scene = scene;
+    this.carController = carController;
+    this.obstacleController = obstacleController;
+
+    // Game UI
+    this.gameUI = {};
+    this.gameUI["lifeUI"] = this.scene.add.text(config.width / 2, 32, "", { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT, align: 'center'}).setOrigin﻿(0.5).setDepth(DEPTH_ENUM.UI);
+    this.gameUI["scoreUI"] = this.scene.add.text(config.width  - 128 - 60, 16 * 4, "0 KM", { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT }).setDepth(DEPTH_ENUM.UI);
+    this.gameUI["speedUI"] = this.scene.add.text(config.width  - 128 - 60, 16, "", { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT }).setDepth(DEPTH_ENUM.UI);
+
+    // Add buttons
+    this.playMenu = {};
+    this.playMenu["playButton"] = new TextButton(this.scene, 16 * 3, 16, 'Play', { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT },
+
+    function () {
+       if (gameController.gameState === GAME_STATE_ENUM.GAMEOVER || gameController.gameState === GAME_STATE_ENUM.IDLE) {
+         gameController.resetGame();
+         gameController.startGame();
+       }
+    }
+
+     , DEPTH_ENUM.UI);
+
+    this.playMenu["optionsButton"] = new TextButton(this.scene, 16 * 3, 48, 'Options', { fontSize: '32px', fill: '#ffffff' }, function () { console.log("Options");} , DEPTH_ENUM.UI);
+    this.playMenu["infoButton"] = new TextButton(this.scene, 16 * 3, 80, 'Info', { fontSize: '32px', fill: '#ffffff' }, function () { console.log("Info");} , DEPTH_ENUM.UI);
+
+    this.resetGame();
+  }
+
+  update (delta, time) {
+    if (this.life > 0) {
+      this.distance += delta * this.carController.forwardSpeed * 4 / (1000.0 * 60.0 * 60.0) ;
+
+      this.gameUI["lifeUI"].text = 'X'.repeat(this.life);
+      this.gameUI["scoreUI"].text = this.distance.toFixed(2) + " KM";
+
+    } else {
+      this.endGame();
+    }
+
+    this.gameUI["speedUI"].text = 4 * this.carController.forwardSpeed.toFixed(0) + " KM/H";
+  }
+
+  resetGame () {
+    this.life = 3;
+    this.distance = 0.0;
+    this.gameState = GAME_STATE_ENUM.IDLE;
+    this.obstacleController.reset();
+    this.carController.reset();
+  }
+
+  startGame () {
+    this.gameState = GAME_STATE_ENUM.RUNNING;
+  }
+
+  endGame () {
+    this.gameUI["lifeUI"].text = "GAME OVER";
+    this.carController.engineOn = false;
+    this.gameState = GAME_STATE_ENUM.GAMEOVER;
+  }
+}
+
 class Obstacle {
   constructor(scene, controller, id, posPercent){
     this.scene = scene;
-    this.sprite = this.scene.physics.add.sprite((config.width - ( 2 * SCREEN_ROAD_OFFSET)) * posPercent + SCREEN_ROAD_OFFSET,  -100, 'barrel').setOrigin(0.5, 0.5);
+    this.sprite = this.scene.physics.add.sprite((config.width - ( 2 * SCREEN_ROAD_OFFSET)) * posPercent + SCREEN_ROAD_OFFSET,  -50, 'barrel').setOrigin(0.5, 0.5);
     this.sprite.body.isCircle = true;
     this.sprite.body.moves = false;
     this.sprite.setDepth(DEPTH_ENUM.OBSTACLE);
@@ -227,7 +265,7 @@ class ObstacleController {
     this.speedMultiplier = ROAD_OBJECT_SPEED_MULTIPLIER;
     this.wallChance = 0.0;
     this.obstaclesUntilChangeChance = 10;
-    this.obstaclesUntilChangeChanceMax = 20;
+    this.obstaclesUntilChangeChanceMax = 15;
   }
 
   update (delta, time, carSpeed) {
@@ -260,11 +298,30 @@ class ObstacleController {
       this.obstaclesUntilChangeChance += -1;
 
       if(this.obstaclesUntilChangeChance < 1) {
-        this.obstaclesUntilChangeChance = Math.ceil(Math.random() * this.obstaclesUntilChangeChanceMax);
+        this.obstaclesUntilChangeChance = 5 + Math.ceil(Math.random() * this.obstaclesUntilChangeChanceMax);
 
         this.wallChance = Math.random();
       }
     }
+  }
+
+  reset (){
+    this.lastSpawnDistance = 0.0;
+    this.maxDeltaDistance = 350.0;
+    this.distance = 0.0;
+    this.wallChance = 0.0;
+    this.obstaclesUntilChangeChance = 10;
+    this.obstaclesUntilChangeChanceMax = 15;
+
+    for(let i = 0; i < this.obstacles.length; ++i) {
+      this.markObstacleForRemoval(this.obstacles[i].id);
+    }
+
+    for(let i = 0; i < this.IDsToDelete.length; ++i){
+      this.removeObstacle(this.IDsToDelete[i]);
+    }
+
+    this.IDsToDelete = [];
   }
 
   markObstacleForRemoval (id) {
@@ -290,19 +347,19 @@ class ObstacleController {
 
 
   createObstacle() {
-    let p = Math.min( 1.0, Math.max(0.0, ((Math.random() - 0.5) * 0.6 + (carController.car.x / config.width))));
+    let p = Math.min( 1.0, Math.max(0.0, ((Math.random() - 0.5) * 0.3 + (carController.car.x / config.width))));
     let ob = new Obstacle(this.scene, this, this.hightestId++, p);
     this.obstacles.push(ob);
     this.physicsGroup.add(ob.sprite);
   }
 
   createWall() {
-    let startingPercent = Math.random();
+    let startingPercent = Math.min( 1.0, Math.max(0.0, ((Math.random() - 0.5) * 0.5 + (carController.car.x / config.width))));
     let direction = Math.random() > 0.5 ? 1.0 : -1.0;
     let obstacleWidthPercent = 56.0 / (config.width - 2 * SCREEN_ROAD_OFFSET);
     let s = obstacleWidthPercent / 10.0;
 
-    for(let i = 0; i < 5; ++i) {
+    for(let i = 0; i < 4; ++i) {
       let p = startingPercent + (direction * obstacleWidthPercent * i) + (direction * s * i);
 
       if (p < 0.0) {
@@ -383,6 +440,14 @@ class CarController {
 
     this.maxFowardSpeed = 12.0;
     this.forwardSpeed = 0.0;
+
+    this.engineOn = true;
+  }
+
+  reset() {
+    this.engineOn = true;
+    this.forwardSpeed = 0.0;
+    this.inputTurnPercent = 0.0;
   }
 
   getTurnSpeed () {
@@ -392,12 +457,17 @@ class CarController {
 
   getHorizontalMovementSpeed () {
     // Todo return a value based on car speed, braking, grip etc
-    return 0.27 * (this.forwardSpeed / this.maxFowardSpeed);
+    return 0.29 * (this.forwardSpeed / this.maxFowardSpeed);
   }
 
   getCarForwardAcceleration () {
     // Todo return a value based on car's rpm, etc
-    return 0.01;
+
+    if(this.engineOn) {
+      return 0.01;
+    } else {
+      return -0.0005;
+    }
   }
 
   getCarTurnSlow() {
