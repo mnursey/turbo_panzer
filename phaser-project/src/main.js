@@ -43,15 +43,22 @@ function preload ()
 function hitCollider(car, collider) {
 
   if( collider.prevHit === null || collider.prevHit === undefined) {
+    collider.setTexture('barrel_down');
     collider.y -= carController.forwardSpeed;
     carController.forwardSpeed = 1.0;
-    collider.setTexture('barrel_down');
     collider.angle = -90;
     collider.prevHit = true;
-    gameController.life += -1;
+
+    if(gameController.gameState === GAME_STATE_ENUM.RUNNING) {
+
+      gameController.life += -1;
+    }
+
   } else {
-    if(carController.forwardSpeed > 5) {
-      carController.forwardSpeed = 5.0;
+    if(gameController.gameState === GAME_STATE_ENUM.RUNNING) {
+      if(carController.forwardSpeed > 5) {
+        carController.forwardSpeed = 5.0;
+      }
     }
   }
 }
@@ -109,17 +116,31 @@ function create ()
 
 function update (time, delta)
 {
-  if(carController !== undefined) {
-    if(inputs[INPUT_ENUM.KEY_LEFT].isDown){
-      carController.inputTurn(TURN_ENUM.LEFT);
-    }
-
-    if(inputs[INPUT_ENUM.KEY_RIGHT].isDown){
-      carController.inputTurn(TURN_ENUM.RIGHT);
-    }
-  }
 
   if(gameController !== undefined) {
+
+    if(carController !== undefined) {
+      if(inputs[INPUT_ENUM.KEY_LEFT].isDown){
+        if (gameController.gameState === GAME_STATE_ENUM.RUNNING) {
+          carController.inputTurn(TURN_ENUM.LEFT);
+        }
+
+        if (gameController.gameState === GAME_STATE_ENUM.IDLE) {
+          gameController.startGame();
+        }
+      }
+
+      if(inputs[INPUT_ENUM.KEY_RIGHT].isDown){
+        if (gameController.gameState === GAME_STATE_ENUM.RUNNING) {
+          carController.inputTurn(TURN_ENUM.RIGHT);
+        }
+
+        if (gameController.gameState === GAME_STATE_ENUM.IDLE) {
+          gameController.startGame();
+        }
+      }
+    }
+
     gameController.update(delta, time);
 
     if(carController !== undefined) {
@@ -173,40 +194,69 @@ class GameController {
     this.carController = carController;
     this.obstacleController = obstacleController;
 
+    this.tutText = "Press Left Arror or Right Arrow to play!";
+
+    // S E N D    N U D E S
+
     // Game UI
     this.gameUI = {};
-    this.gameUI["lifeUI"] = this.scene.add.text(config.width / 2, 32, "", { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT, align: 'center'}).setOrigin﻿(0.5).setDepth(DEPTH_ENUM.UI);
-    this.gameUI["scoreUI"] = this.scene.add.text(config.width  - 128 - 60, 16 * 4, "0 KM", { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT }).setDepth(DEPTH_ENUM.UI);
-    this.gameUI["speedUI"] = this.scene.add.text(config.width  - 128 - 60, 16, "", { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT }).setDepth(DEPTH_ENUM.UI);
+    this.gameUI["lifeUI"] = new TextButton(this.scene, config.width / 2, 32, "", { fontSize: '32px', fill: '#e1eeee' }, undefined , DEPTH_ENUM.UI).setOrigin(0.5);
+    new TextButton(this.scene, config.width  - 128 - 60, 16 * 4, "", { fontSize: '32px', fill: '#e1eeee' }, undefined , DEPTH_ENUM.UI);
+    this.gameUI["scoreUI"] = new TextButton(this.scene, config.width  - 128 - 60, 16 * 4, "", { fontSize: '32px', fill: '#e1eeee' }, undefined , DEPTH_ENUM.UI);
+    this.gameUI["speedUI"] = new TextButton(this.scene, config.width  - 128 - 60, 16, "", { fontSize: '32px', fill: '#e1eeee' }, undefined , DEPTH_ENUM.UI);
 
     // Add buttons
     this.playMenu = {};
-    this.playMenu["playButton"] = new TextButton(this.scene, 16 * 3, 16, 'Play', { fontSize: '32px', fill: '#ffffff' , fontFamily: DEFAULT_FONT },
+    this.playMenu["playButton"] = new TextButton(this.scene,  config.width / 2, config.height / 2 - 200, '', { fontSize: '32px', fill: '#e1eeee' , fontFamily: DEFAULT_FONT },
 
     function () {
-       if (gameController.gameState === GAME_STATE_ENUM.GAMEOVER || gameController.gameState === GAME_STATE_ENUM.IDLE) {
-         gameController.resetGame();
+       if (gameController.gameState === GAME_STATE_ENUM.IDLE) {
          gameController.startGame();
+       }
+
+       if (gameController.gameState === GAME_STATE_ENUM.GAMEOVER) {
+         carController.engineOn = true;
+         gameController.gameUI["scoreUI"].text = "";
+         gameController.resetGame();
        }
     }
 
-     , DEPTH_ENUM.UI);
+     , DEPTH_ENUM.UI).setOrigin(0.5);
 
-    this.playMenu["optionsButton"] = new TextButton(this.scene, 16 * 3, 48, 'Options', { fontSize: '32px', fill: '#ffffff' }, function () { console.log("Options");} , DEPTH_ENUM.UI);
-    this.playMenu["infoButton"] = new TextButton(this.scene, 16 * 3, 80, 'Info', { fontSize: '32px', fill: '#ffffff' }, function () { console.log("Info");} , DEPTH_ENUM.UI);
+    this.playMenu["optionsButton"] = new TextButton(this.scene, 16 * 3, 48, '', { fontSize: '32px', fill: '#ffffff' }, function () { console.log("Options");} , DEPTH_ENUM.UI);
+    this.playMenu["infoButton"] = new TextButton(this.scene, config.width / 2, config.height / 2 - 200, this.tutText, { fontSize: '32px', fill: '#e1eeee' }, undefined , DEPTH_ENUM.UI).setOrigin(0.5);
 
     this.resetGame();
   }
 
   update (delta, time) {
-    if (this.life > 0) {
-      this.distance += delta * this.carController.forwardSpeed * 4 / (1000.0 * 60.0 * 60.0) ;
 
-      this.gameUI["lifeUI"].text = 'X'.repeat(this.life);
-      this.gameUI["scoreUI"].text = this.distance.toFixed(2) + " KM";
+    if(this.gameState === GAME_STATE_ENUM.RESETTING) {
 
-    } else {
-      this.endGame();
+      if (this.carController.forwardSpeed > 6.0) {
+        this.carController.forwardSpeed = 6.0;
+      }
+
+      if (this.obstacleController.obstacles.length === 0) {
+        this.obstacleController.reset();
+        this.carController.reset();
+
+        this.gameUI["lifeUI"].text = "";
+        this.playMenu["infoButton"].text = this.tutText;
+        this.gameState = GAME_STATE_ENUM.IDLE;
+      }
+    }
+
+    if (this.gameState === GAME_STATE_ENUM.RUNNING) {
+      if (this.life > 0) {
+        this.distance += delta * this.carController.forwardSpeed * 4 / (1000.0 * 60.0 * 60.0) ;
+
+        this.gameUI["lifeUI"].text = 'X'.repeat(this.life);
+        this.gameUI["scoreUI"].text = this.distance.toFixed(2) + " KM";
+
+      } else {
+        this.endGame();
+      }
     }
 
     this.gameUI["speedUI"].text = 4 * this.carController.forwardSpeed.toFixed(0) + " KM/H";
@@ -215,19 +265,25 @@ class GameController {
   resetGame () {
     this.life = 3;
     this.distance = 0.0;
-    this.gameState = GAME_STATE_ENUM.IDLE;
-    this.obstacleController.reset();
-    this.carController.reset();
+    this.gameState = GAME_STATE_ENUM.RESETTING;
+    this.obstacleController.spawn = false;
+    this.playMenu["playButton"].text = "";
   }
 
   startGame () {
-    this.gameState = GAME_STATE_ENUM.RUNNING;
+    if (this.gameState === GAME_STATE_ENUM.IDLE) {
+      this.gameState = GAME_STATE_ENUM.RUNNING;
+      carController.engineOn = true;
+      this.obstacleController.start();
+      this.playMenu["infoButton"].text = "";
+    }
   }
 
   endGame () {
     this.gameUI["lifeUI"].text = "GAME OVER";
     this.carController.engineOn = false;
     this.gameState = GAME_STATE_ENUM.GAMEOVER;
+    this.playMenu["playButton"].text = "Restart";
   }
 }
 
@@ -266,6 +322,7 @@ class ObstacleController {
     this.wallChance = 0.0;
     this.obstaclesUntilChangeChance = 10;
     this.obstaclesUntilChangeChanceMax = 15;
+    this.spawn = false;
   }
 
   update (delta, time, carSpeed) {
@@ -284,7 +341,7 @@ class ObstacleController {
 
     this.IDsToDelete = [];
 
-    if(this.distance - this.lastSpawnDistance > this.maxDeltaDistance) {
+    if(this.distance - this.lastSpawnDistance > this.maxDeltaDistance && this.spawn) {
       this.lastSpawnDistance = this.distance;
 
       let wC = Math.random();
@@ -303,6 +360,10 @@ class ObstacleController {
         this.wallChance = Math.random();
       }
     }
+  }
+
+  start (){
+    this.spawn = true;
   }
 
   reset (){
@@ -441,11 +502,11 @@ class CarController {
     this.maxFowardSpeed = 12.0;
     this.forwardSpeed = 0.0;
 
-    this.engineOn = true;
+    this.engineOn = false;
   }
 
   reset() {
-    this.engineOn = true;
+    this.engineOn = false;
     this.forwardSpeed = 0.0;
     this.inputTurnPercent = 0.0;
   }

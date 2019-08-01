@@ -13,9 +13,10 @@ class TextButton extends Phaser.GameObjects.Text {
     this.on('pointerout', () => this.resetState());
     this.on('pointerdown', () => this.activeState());
     this.setScrollFactor(0);
+    this.clickCallback = clickCallback;
     this.on('pointerup', () => {
         this.hoverState();
-        if(clickCallback !== undefined){
+        if(this.clickCallback !== undefined && this.clickCallback !== undefined){
           clickCallback();
         }
     });
@@ -24,14 +25,23 @@ class TextButton extends Phaser.GameObjects.Text {
   }
 
   hoverState() {
-    this.setStyle({fontSize: '36px', fill : '#FFA500'});
+    if(this.clickCallback !== undefined && this.clickCallback !== undefined){
+      //this.setStyle({fontSize: '36px', fill : '#FFA500'});
+      this.setStyle({fontSize: '36px'});
+
+    }
   }
 
   resetState(){
-    this.setStyle(this.defaultStyle);
+    if(this.clickCallback !== undefined && this.clickCallback !== undefined){
+      this.setStyle(this.defaultStyle);
+    }
   }
 
   activeState(){
-    this.setStyle({fontSize: '38px', fill : '#ffffff'});
+    if(this.clickCallback !== undefined && this.clickCallback !== undefined){
+      //this.setStyle({fontSize: '38px', fill : '#ffffff'});
+      this.setStyle({fontSize: '38px'});
+    }
   }
 }
