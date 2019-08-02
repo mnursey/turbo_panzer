@@ -29,3 +29,9 @@ var GAME_STATE_ENUM = {
   RESETTING : 2,
   GAMEOVER : 3,
 }
+
+var FADE_STATE_ENUM = {
+  NONE : 0,
+  IN : 1,
+  OUT : 2
+}

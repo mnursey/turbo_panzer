@@ -38,6 +38,9 @@ function preload ()
     this.load.image('barrel', 'assets/barrel_blue.png');
     this.load.image('barrel_down', 'assets/barrel_blue_down.png');
     this.load.image('sky', 'assets/sky.png');
+    this.load.bitmapFont('main_font', 'assets/fonts/main_font_one.png', 'assets/fonts/main_font_one.fnt');
+    //this.load.bitmapFont('second_font', 'assets/fonts/second_font_one.png', 'assets/fonts/second_font_one.fnt');
+
 }
 
 function hitCollider(car, collider) {
@@ -90,7 +93,6 @@ function create ()
 
     gameColliders = this.physics.add.collider(carController.car, obstacleController.physicsGroup, hitCollider, null, this);
     gameColliders.overlapOnly = true;
-    console.log(gameColliders);
 
     //  Input Events
     cursors = this.input.keyboard.createCursorKeys();
@@ -200,14 +202,15 @@ class GameController {
 
     // Game UI
     this.gameUI = {};
-    this.gameUI["lifeUI"] = new TextButton(this.scene, config.width / 2, 32, "", { fontSize: '32px', fill: '#e1eeee' }, undefined , DEPTH_ENUM.UI).setOrigin(0.5);
-    new TextButton(this.scene, config.width  - 128 - 60, 16 * 4, "", { fontSize: '32px', fill: '#e1eeee' }, undefined , DEPTH_ENUM.UI);
-    this.gameUI["scoreUI"] = new TextButton(this.scene, config.width  - 128 - 60, 16 * 4, "", { fontSize: '32px', fill: '#e1eeee' }, undefined , DEPTH_ENUM.UI);
-    this.gameUI["speedUI"] = new TextButton(this.scene, config.width  - 128 - 60, 16, "", { fontSize: '32px', fill: '#e1eeee' }, undefined , DEPTH_ENUM.UI);
+    this.gameUI["lifeUI"] = new BitmapTextButton(this.scene, config.width / 2, 46, "", "main_font", undefined , 64, 1, DEPTH_ENUM.UI).setOrigin(0.5);
+
+    this.gameUI["scoreUI"] = new BitmapTextButton(this.scene, config.width  - 128 - 60, 16 * 4, "", "main_font", undefined , 46, 1, DEPTH_ENUM.UI);
+
+    this.gameUI["speedUI"] = new BitmapTextButton(this.scene, config.width  - 128 - 60, 16, "", "main_font", undefined , 46, 1, DEPTH_ENUM.UI);
 
     // Add buttons
     this.playMenu = {};
-    this.playMenu["playButton"] = new TextButton(this.scene,  config.width / 2, config.height / 2 - 200, '', { fontSize: '32px', fill: '#e1eeee' , fontFamily: DEFAULT_FONT },
+    this.playMenu["playButton"] = new BitmapTextButton(this.scene,  config.width / 2, config.height / 2 - 200, 'Restart', "main_font",
 
     function () {
        if (gameController.gameState === GAME_STATE_ENUM.IDLE) {
@@ -216,15 +219,26 @@ class GameController {
 
        if (gameController.gameState === GAME_STATE_ENUM.GAMEOVER) {
          carController.engineOn = true;
-         gameController.gameUI["scoreUI"].text = "";
+         gameController.gameUI["scoreUI"].fadeOut();
+         gameController.gameUI["speedUI"].fadeOut();
          gameController.resetGame();
        }
     }
 
-     , DEPTH_ENUM.UI).setOrigin(0.5);
+     , 46, 1, DEPTH_ENUM.UI).setOrigin(0.5);
 
-    this.playMenu["optionsButton"] = new TextButton(this.scene, 16 * 3, 48, '', { fontSize: '32px', fill: '#ffffff' }, function () { console.log("Options");} , DEPTH_ENUM.UI);
-    this.playMenu["infoButton"] = new TextButton(this.scene, config.width / 2, config.height / 2 - 200, this.tutText, { fontSize: '32px', fill: '#e1eeee' }, undefined , DEPTH_ENUM.UI).setOrigin(0.5);
+
+    this.playMenu["optionsButton"] = new BitmapTextButton(this.scene, 16 * 3, 48, '', "main_font", undefined , 46, 1, DEPTH_ENUM.UI);
+
+    this.playMenu["infoButton"] = new BitmapTextButton(this.scene, config.width / 2, config.height / 2 - 200, this.tutText, "main_font", undefined , 46, 1, DEPTH_ENUM.UI).setOrigin(0.5);
+    this.playMenu["infoButton"].fadeIn();
+
+    this.playMenu["infoButton"].tint = 0xd3e6e6;
+    this.playMenu["playButton"].tint = 0xd3e6e6;
+    this.playMenu["optionsButton"].tint = 0xd3e6e6;
+    this.gameUI["speedUI"].tint = 0xd3e6e6;
+    this.gameUI["scoreUI"].tint = 0xd3e6e6;
+    this.gameUI["lifeUI"].tint = 0xd3e6e6;
 
     this.resetGame();
   }
@@ -241,8 +255,8 @@ class GameController {
         this.obstacleController.reset();
         this.carController.reset();
 
-        this.gameUI["lifeUI"].text = "";
-        this.playMenu["infoButton"].text = this.tutText;
+        this.gameUI["lifeUI"].fadeOut();
+        this.playMenu["infoButton"].fadeIn();
         this.gameState = GAME_STATE_ENUM.IDLE;
       }
     }
@@ -267,7 +281,7 @@ class GameController {
     this.distance = 0.0;
     this.gameState = GAME_STATE_ENUM.RESETTING;
     this.obstacleController.spawn = false;
-    this.playMenu["playButton"].text = "";
+    this.playMenu["playButton"].fadeOut();
   }
 
   startGame () {
@@ -275,7 +289,10 @@ class GameController {
       this.gameState = GAME_STATE_ENUM.RUNNING;
       carController.engineOn = true;
       this.obstacleController.start();
-      this.playMenu["infoButton"].text = "";
+      this.playMenu["infoButton"].fadeOut();
+      this.gameUI["scoreUI"].fadeIn();
+      this.gameUI["lifeUI"].fadeIn();
+      this.gameUI["speedUI"].fadeIn();
     }
   }
 
@@ -283,7 +300,7 @@ class GameController {
     this.gameUI["lifeUI"].text = "GAME OVER";
     this.carController.engineOn = false;
     this.gameState = GAME_STATE_ENUM.GAMEOVER;
-    this.playMenu["playButton"].text = "Restart";
+    this.playMenu["playButton"].fadeIn();
   }
 }
 
