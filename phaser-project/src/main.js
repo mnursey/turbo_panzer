@@ -454,6 +454,9 @@ class BorderController {
 
     this.minXPosDiff = 20;
 
+    this.prevLeftV = 0;
+    this.prevRightV = 0;
+
     for(let i = 0; i < 5; ++i) {
       this.addSegment(i * 300, LR_ENUM.LEFT);
       this.addSegment(i * 300, LR_ENUM.RIGHT);
@@ -471,14 +474,14 @@ class BorderController {
         this.addSegment(-300, LR_ENUM.LEFT);
         this.distanceSinceLastSegmentLeft = 0.0;
 
-        this.nextLeftDistance = getRndInteger(120, 360);
+        this.nextLeftDistance = getRndInteger(100, 360);
     }
 
     if(this.distanceSinceLastSegmentRight > this.nextRightDistance) {
         this.addSegment(-300, LR_ENUM.RIGHT);
         this.distanceSinceLastSegmentRight = 0.0;
 
-        this.nextRightDistance = getRndInteger(120, 360);
+        this.nextRightDistance = getRndInteger(100, 360);
     }
 
     for(let i = 0; i < this.borderSegments.length; ++i){
@@ -516,8 +519,33 @@ class BorderController {
 
   addSegment(yPos, side){
 
-    let v = getRndInteger(-SCREEN_BUILDING_OFFSET_VARIANCE, SCREEN_BUILDING_OFFSET_VARIANCE / 2);
-    let xPos = side === LR_ENUM.LEFT ? SCREEN_BUILDING_OFFSET + v : config.width - SCREEN_BUILDING_OFFSET + v;
+    let v = getRndInteger(0, SCREEN_BUILDING_OFFSET_VARIANCE) * SCREEN_BUILDING_OFFSET_VARIANCE_WIDTH;
+
+    if (side === LR_ENUM.LEFT) {
+      if (this.prevLeftV === v) {
+        v += -SCREEN_BUILDING_OFFSET_VARIANCE_WIDTH;
+
+        if (v < 0){
+          v = SCREEN_BUILDING_OFFSET_VARIANCE * SCREEN_BUILDING_OFFSET_VARIANCE_WIDTH;
+        }
+      }
+
+      this.prevLeftV = v;
+    }
+
+    if (side === LR_ENUM.RIGHT) {
+      if (this.prevRightV === v) {
+        v += -SCREEN_BUILDING_OFFSET_VARIANCE_WIDTH;
+
+        if (v < 0){
+          v = SCREEN_BUILDING_OFFSET_VARIANCE * SCREEN_BUILDING_OFFSET_VARIANCE_WIDTH;
+        }
+      }
+
+      this.prevRightV = v;
+    }
+
+    let xPos = side === LR_ENUM.LEFT ? SCREEN_BUILDING_OFFSET + v : config.width - SCREEN_BUILDING_OFFSET - v;
 
     let segment = new Building(this.scene, this, this.borderSegments.length, side, xPos, yPos);
 
@@ -562,7 +590,7 @@ class CarController {
 
   getHorizontalMovementSpeed () {
     // Todo return a value based on car speed, braking, grip etc
-    return 0.29 * (this.forwardSpeed / this.maxFowardSpeed);
+    return 0.19 * (this.forwardSpeed / this.maxFowardSpeed);
   }
 
   getCarForwardAcceleration () {
