@@ -5,7 +5,7 @@ var config = {
     physics: {
         default: 'arcade',
         arcade: {
-            debug: true
+            debug: false
         }
     },
     scene: {
@@ -22,7 +22,7 @@ var camera;
 var backgroundImage;
 
 var carController = undefined;
-var roadController = undefined;
+var borderController = undefined;
 var gameController = undefined;
 var obstacleController = undefined;
 
@@ -37,6 +37,7 @@ function preload ()
 
     this.load.image('purple_building', 'assets/scene_art/purple_building.png');
     this.load.image('dark_blue_building', 'assets/scene_art/dark_blue_building.png');
+    this.load.image('building_shadow', 'assets/scene_art/building_shadow.png');
 
     this.load.image('car', 'assets/scene_art/orange_car_0.png');
 
@@ -91,7 +92,7 @@ function create ()
     camera = this.cameras.main;
 
     // road controller
-    roadController = new BorderController(this);
+    borderController = new BorderController(this);
 
     // obstacle controller
     obstacleController = new ObstacleController(this);
@@ -153,8 +154,8 @@ function update (time, delta)
     if(carController !== undefined) {
       carController.update(delta, time);
 
-      if(roadController !== undefined){
-        roadController.update(delta, carController.forwardSpeed);
+      if(borderController !== undefined){
+        borderController.update(delta, time, carController.forwardSpeed);
       }
 
       if (obstacleController !== undefined) {
@@ -309,27 +310,6 @@ class GameController {
   }
 }
 
-class Obstacle {
-  constructor(scene, controller, id, posPercent){
-    this.scene = scene;
-    this.sprite = this.scene.physics.add.sprite((config.width - ( 2 * SCREEN_ROAD_OFFSET)) * posPercent + SCREEN_ROAD_OFFSET,  -50, 'barrel').setOrigin(0.5, 0.5);
-    this.sprite.body.isCircle = true;
-    this.sprite.body.moves = false;
-    this.sprite.setDepth(DEPTH_ENUM.OBSTACLE);
-    this.controller = controller;
-    this.speedMultiplier = ROAD_OBJECT_SPEED_MULTIPLIER;
-    this.id = id;
-  }
-
-  update (delta, time, carSpeed) {
-    this.sprite.y += carSpeed * delta * this.speedMultiplier;
-    this.sprite.body.position.y = this.sprite.y - 56 / 2;
-    if (this.sprite.y - 28 * 2 > config.height) {
-      this.controller.markObstacleForRemoval(this.id);
-    }
-  }
-}
-
 class ObstacleController {
   constructor(scene) {
     this.scene = scene;
@@ -469,39 +449,41 @@ class BorderController {
     this.distanceSinceLastSegmentLeft = 333.0;
     this.distanceSinceLastSegmentRight = 333.0;
 
+    this.nextLeftDistance = 0;
+    this.nextRightDistance = 0;
+
+    this.minXPosDiff = 20;
+
     for(let i = 0; i < 5; ++i) {
       this.addSegment(i * 300, LR_ENUM.LEFT);
       this.addSegment(i * 300, LR_ENUM.RIGHT);
     }
   }
 
-  update (delta, carSpeed) {
+  update (delta, time, carSpeed) {
 
     let deltaDistane = carSpeed * delta * this.speedMultiplier;
 
     this.distanceSinceLastSegmentLeft += deltaDistane;
     this.distanceSinceLastSegmentRight += deltaDistane;
 
-    if(this.distanceSinceLastSegmentLeft > 300) {
+    if(this.distanceSinceLastSegmentLeft > this.nextLeftDistance) {
         this.addSegment(-300, LR_ENUM.LEFT);
         this.distanceSinceLastSegmentLeft = 0.0;
+
+        this.nextLeftDistance = getRndInteger(120, 360);
     }
 
-    if(this.distanceSinceLastSegmentRight > 300) {
+    if(this.distanceSinceLastSegmentRight > this.nextRightDistance) {
         this.addSegment(-300, LR_ENUM.RIGHT);
         this.distanceSinceLastSegmentRight = 0.0;
+
+        this.nextRightDistance = getRndInteger(120, 360);
     }
 
     for(let i = 0; i < this.borderSegments.length; ++i){
-      let roadSegment = this.borderSegments[i];
-      //roadSegment.y += deltaDistane;
-
-      //roadSegment.body.position.y = roadSegment.y - roadSegment.displayHeight / 2;
-      roadSegment.body.position.y += deltaDistane;
-
-      if(roadSegment.y - 300 / 2 > config.height){
-        this.markSegmentForDelete(roadSegment);
-      }
+      let segment = this.borderSegments[i];
+      segment.update(delta, time, carSpeed);
     }
 
     for(let i = 0; i < this.expiredSegments.length; ++i){
@@ -528,27 +510,16 @@ class BorderController {
     let segment = this.borderSegments[index];
     this.borderSegments.splice(index, 1);
 
-    segment.destroy(true);
+    segment.remove();
     segment = null;
   }
 
-  addSegment(yOffset, side){
+  addSegment(yPos, side){
 
-    let v = getRndInteger(-SCREEN_BUILDING_OFFSET_VARIANCE, SCREEN_BUILDING_OFFSET_VARIANCE);
+    let v = getRndInteger(-SCREEN_BUILDING_OFFSET_VARIANCE, SCREEN_BUILDING_OFFSET_VARIANCE / 2);
     let xPos = side === LR_ENUM.LEFT ? SCREEN_BUILDING_OFFSET + v : config.width - SCREEN_BUILDING_OFFSET + v;
-    let flip = side === LR_ENUM.LEFT ? true : false;
 
-    let segment = this.scene.physics.add.sprite(xPos, yOffset, 'dark_blue_building').setOrigin(0.5, 0.5).setFlipX(flip);
-
-    segment.scale = 0.8;
-
-    //let roadTiles = [leftRoad, rightRoad];
-
-    /*for(let i = 0; i < roadTiles.length; ++i){
-      roadTiles[i].setDepth(DEPTH_ENUM.ROAD);
-    }*/
-
-    //let segment = this.scene.add.container(0, yOffset, roadTiles);
+    let segment = new Building(this.scene, this, this.borderSegments.length, side, xPos, yPos);
 
     this.borderSegments.push(segment)
   }
