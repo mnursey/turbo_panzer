@@ -5,7 +5,7 @@ var config = {
     physics: {
         default: 'arcade',
         arcade: {
-            debug: false
+            debug: true
         }
     },
     scene: {
@@ -34,7 +34,12 @@ function preload ()
     this.load.image('road_blank', 'assets/road_blank.png');
     this.load.image('road_straight_left', 'assets/road_straight_left.png');
     this.load.image('road_straight_right', 'assets/road_straight_right.png');
-    this.load.image('car', 'assets/car_red.png');
+
+    this.load.image('purple_building', 'assets/scene_art/purple_building.png');
+    this.load.image('dark_blue_building', 'assets/scene_art/dark_blue_building.png');
+
+    this.load.image('car', 'assets/scene_art/orange_car_0.png');
+
     this.load.image('barrel', 'assets/barrel_blue.png');
     this.load.image('barrel_down', 'assets/barrel_blue_down.png');
     this.load.image('sky', 'assets/sky.png');
@@ -69,8 +74,8 @@ function hitCollider(car, collider) {
 function create ()
 {
     //  A simple background for our game
-    backgroundImage = this.add.image(config.width / 2, config.height / 2, 'sky');
-    backgroundImage.setScale(config.width / 800, config.height / 600);
+    //backgroundImage = this.add.image(config.width / 2, config.height / 2, 'sky');
+    //backgroundImage.setScale(config.width / 800, config.height / 600);
 
     // Define inputs
     inputs = [
@@ -86,7 +91,7 @@ function create ()
     camera = this.cameras.main;
 
     // road controller
-    roadController = new RoadController(this);
+    roadController = new BorderController(this);
 
     // obstacle controller
     obstacleController = new ObstacleController(this);
@@ -110,7 +115,7 @@ function create ()
     };
 
     // Set Background colour
-    camera.setBackgroundColor("#003441");
+    camera.setBackgroundColor("#101823");
 
     // Create game controller
     gameController = new GameController(this, carController, obstacleController);
@@ -455,54 +460,105 @@ class ObstacleController {
   }
 }
 
-class RoadController {
+class BorderController {
   constructor (scene) {
     this.scene = scene;
-    this.roadSegments = [];
+    this.borderSegments = [];
+    this.expiredSegments = [];
     this.speedMultiplier = ROAD_OBJECT_SPEED_MULTIPLIER;
+    this.distanceSinceLastSegmentLeft = 333.0;
+    this.distanceSinceLastSegmentRight = 333.0;
 
-    for(let i = 0 ; i < 20; i += 1){
-      this.addSegment(i * 128);
+    for(let i = 0; i < 5; ++i) {
+      this.addSegment(i * 300, LR_ENUM.LEFT);
+      this.addSegment(i * 300, LR_ENUM.RIGHT);
     }
   }
 
   update (delta, carSpeed) {
-    for(let i = 0; i < this.roadSegments.length; ++i){
-      let roadSegment = this.roadSegments[i];
-      roadSegment.y += carSpeed * delta * this.speedMultiplier;
 
-      if(roadSegment.y - 128 / 2 > config.height){
-        roadSegment.y = -830 + (roadSegment.y - config.height);
+    let deltaDistane = carSpeed * delta * this.speedMultiplier;
+
+    this.distanceSinceLastSegmentLeft += deltaDistane;
+    this.distanceSinceLastSegmentRight += deltaDistane;
+
+    if(this.distanceSinceLastSegmentLeft > 300) {
+        this.addSegment(-300, LR_ENUM.LEFT);
+        this.distanceSinceLastSegmentLeft = 0.0;
+    }
+
+    if(this.distanceSinceLastSegmentRight > 300) {
+        this.addSegment(-300, LR_ENUM.RIGHT);
+        this.distanceSinceLastSegmentRight = 0.0;
+    }
+
+    for(let i = 0; i < this.borderSegments.length; ++i){
+      let roadSegment = this.borderSegments[i];
+      //roadSegment.y += deltaDistane;
+
+      //roadSegment.body.position.y = roadSegment.y - roadSegment.displayHeight / 2;
+      roadSegment.body.position.y += deltaDistane;
+
+      if(roadSegment.y - 300 / 2 > config.height){
+        this.markSegmentForDelete(roadSegment);
       }
     }
+
+    for(let i = 0; i < this.expiredSegments.length; ++i){
+      this.removeSegment(this.expiredSegments[i]);
+    }
+
+    this.expiredSegments = [];
   }
 
-  addSegment(yOffset){
-    let leftRoad = this.scene.physics.add.sprite(SCREEN_ROAD_OFFSET, 0, 'road_straight_left').setOrigin(0.5, 0.5);
-    let rightRoad = this.scene.physics.add.sprite(config.width - SCREEN_ROAD_OFFSET, 0, 'road_straight_right').setOrigin(0.5, 0.5);
+  markSegmentForDelete(roadSegment) {
+    this.expiredSegments.push(roadSegment);
+  }
 
-    let roadTiles = [leftRoad, rightRoad];
+  removeSegment(roadSegment){
 
-    for(let i = SCREEN_ROAD_OFFSET + 128 / 2; i < config.width - SCREEN_ROAD_OFFSET - 128 / 2; i += 128 / 2) {
-      roadTiles.push(this.scene.physics.add.sprite(i, 0, 'road_blank').setOrigin(0.5, 0.5));
+    let index = this.borderSegments.findIndex(function(o){
+      if(o === roadSegment) {
+        return true;
+      } else {
+        return false;
+      }
+    });
 
-    }
+    let segment = this.borderSegments[index];
+    this.borderSegments.splice(index, 1);
 
+    segment.destroy(true);
+    segment = null;
+  }
 
-    for(let i = 0; i < roadTiles.length; ++i){
+  addSegment(yOffset, side){
+
+    let v = getRndInteger(-SCREEN_BUILDING_OFFSET_VARIANCE, SCREEN_BUILDING_OFFSET_VARIANCE);
+    let xPos = side === LR_ENUM.LEFT ? SCREEN_BUILDING_OFFSET + v : config.width - SCREEN_BUILDING_OFFSET + v;
+    let flip = side === LR_ENUM.LEFT ? true : false;
+
+    let segment = this.scene.physics.add.sprite(xPos, yOffset, 'dark_blue_building').setOrigin(0.5, 0.5).setFlipX(flip);
+
+    segment.scale = 0.8;
+
+    //let roadTiles = [leftRoad, rightRoad];
+
+    /*for(let i = 0; i < roadTiles.length; ++i){
       roadTiles[i].setDepth(DEPTH_ENUM.ROAD);
-    }
+    }*/
 
-    let segment = this.scene.add.container(0, 450 + yOffset, roadTiles);
+    //let segment = this.scene.add.container(0, yOffset, roadTiles);
 
-    this.roadSegments.push(segment)
+    this.borderSegments.push(segment)
   }
 }
 
 class CarController {
   constructor (scene) {
     this.scene = scene;
-    this.car = this.scene.physics.add.sprite(config.width / 2, config.height - config.height * 0.25, 'car').setOrigin(0.5, 0.5);
+    this.car = this.scene.physics.add.sprite(config.width / 2, config.height - config.height * 0.15, 'car').setOrigin(0.5, 0.5);
+    this.car.scale = 0.80;
     this.car.body.moves = false;
     this.car.setCollideWorldBounds = false;
     this.car.setInteractive();
@@ -514,7 +570,7 @@ class CarController {
     this.inputTurnFade = 15.0;
 
     this.carHorizontalPositionPercent = 0.0;
-    this.sceneHorizontalSpace = 0.8;
+    this.sceneHorizontalSpace = 0.9;
 
     this.maxFowardSpeed = 12.0;
     this.forwardSpeed = 0.0;

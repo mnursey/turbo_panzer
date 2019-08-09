@@ -36,3 +36,7 @@ var moveToPosition = function (parameters) {
     return STATE_ENUM.RUNNING;
   }
 }
+
+function getRndInteger(min, max) {
+  return Math.floor(Math.random() * (max - min) ) + min;
+}
