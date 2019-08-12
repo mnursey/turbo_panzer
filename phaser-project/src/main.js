@@ -40,6 +40,10 @@ function preload ()
     this.load.image('building_shadow', 'assets/scene_art/building_shadow.png');
 
     this.load.image('car', 'assets/scene_art/orange_car_0.png');
+    this.load.image('car_shadow', 'assets/scene_art/car_shadow.png');
+
+    this.load.image('wide_barrier', 'assets/scene_art/wide_barrier.png');
+    this.load.image('barrier_light', 'assets/scene_art/barrier_light.png');
 
     this.load.image('barrel', 'assets/barrel_blue.png');
     this.load.image('barrel_down', 'assets/barrel_blue_down.png');
@@ -52,10 +56,10 @@ function preload ()
 function hitCollider(car, collider) {
 
   if( collider.prevHit === null || collider.prevHit === undefined) {
-    collider.setTexture('barrel_down');
+    //collider.setTexture('barrel_down');
     collider.y -= carController.forwardSpeed;
     carController.forwardSpeed = 1.0;
-    collider.angle = -90;
+    //collider.angle = -90;
     collider.prevHit = true;
 
     if(gameController.gameState === GAME_STATE_ENUM.RUNNING) {
@@ -316,15 +320,11 @@ class ObstacleController {
     this.obstacles = [];
     this.IDsToDelete = [];
     this.hightestId = 0;
-    this.lastSpawnDistance = 0.0;
-    this.maxDeltaDistance = 350.0;
-    this.distance = 0.0;
     this.physicsGroup = this.scene.physics.add.group({});
     this.speedMultiplier = ROAD_OBJECT_SPEED_MULTIPLIER;
-    this.wallChance = 0.0;
-    this.obstaclesUntilChangeChance = 10;
-    this.obstaclesUntilChangeChanceMax = 15;
     this.spawn = false;
+
+    this.reset();
   }
 
   update (delta, time, carSpeed) {
@@ -359,7 +359,8 @@ class ObstacleController {
       if(this.obstaclesUntilChangeChance < 1) {
         this.obstaclesUntilChangeChance = 5 + Math.ceil(Math.random() * this.obstaclesUntilChangeChanceMax);
 
-        this.wallChance = Math.random();
+        //this.wallChance = Math.random();
+        this.wallChance = 0.0;
       }
     }
   }
@@ -370,7 +371,7 @@ class ObstacleController {
 
   reset (){
     this.lastSpawnDistance = 0.0;
-    this.maxDeltaDistance = 350.0;
+    this.maxDeltaDistance = 550.0;
     this.distance = 0.0;
     this.wallChance = 0.0;
     this.obstaclesUntilChangeChance = 10;
@@ -404,7 +405,8 @@ class ObstacleController {
     let obstacle = this.obstacles[index];
     this.obstacles.splice(index, 1);
 
-    obstacle.sprite.destroy(true);
+
+    obstacle.remove();
     obstacle = null;
   }
 
@@ -474,14 +476,14 @@ class BorderController {
         this.addSegment(-300, LR_ENUM.LEFT);
         this.distanceSinceLastSegmentLeft = 0.0;
 
-        this.nextLeftDistance = getRndInteger(100, 360);
+        this.nextLeftDistance = getRndInteger(160, 360);
     }
 
     if(this.distanceSinceLastSegmentRight > this.nextRightDistance) {
         this.addSegment(-300, LR_ENUM.RIGHT);
         this.distanceSinceLastSegmentRight = 0.0;
 
-        this.nextRightDistance = getRndInteger(100, 360);
+        this.nextRightDistance = getRndInteger(160, 360);
     }
 
     for(let i = 0; i < this.borderSegments.length; ++i){
@@ -557,11 +559,16 @@ class CarController {
   constructor (scene) {
     this.scene = scene;
     this.car = this.scene.physics.add.sprite(config.width / 2, config.height - config.height * 0.15, 'car').setOrigin(0.5, 0.5);
-    this.car.scale = 0.80;
+    this.car.setScale(0.8);
     this.car.body.moves = false;
     this.car.setCollideWorldBounds = false;
     this.car.setInteractive();
     this.car.setDepth(DEPTH_ENUM.CAR);
+
+    this.carShadow = this.scene.physics.add.sprite(config.width / 2, config.height - config.height * 0.15, 'car_shadow').setOrigin(0.5, 0.5);
+    this.carShadow.setScale(0.6);
+    this.carShadow.body.moves = false;
+    this.carShadow.setDepth(DEPTH_ENUM.CAR_SHADOW);
 
     this.maxAngle = 25.0;
     this.inputTurnPercent = 0.0;
@@ -643,6 +650,7 @@ class CarController {
     let prevX = this.car.x;
 
     this.car.x = (config.width * (this.carHorizontalPositionPercent / 100.0) / 2.0 * this.sceneHorizontalSpace) + (config.width / 2);
+    this.carShadow.x = this.car.x;
 
     // If car has not moved centre to straight
     if (this.car.x == prevX) {
@@ -659,6 +667,8 @@ class CarController {
     if (this.car.angle > this.maxAngle) {
       this.car.angle = this.maxAngle;
     }
+
+    this.carShadow.angle = this.car.angle;
 
     // Pull turn input back to zero
     this.inputTurnPercent = pullValueTo(this.inputTurnPercent, 0.0, this.inputTurnFade);

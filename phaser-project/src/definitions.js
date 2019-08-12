@@ -5,7 +5,9 @@ var DEPTH_ENUM = {
   BUILDING__ : 49,
   BUILDING : 50,
   BUILDING_ : 51,
+  CAR_SHADOW : 48,
   CAR : 75,
+  OBSTACLE_SHADOW : 73,
   OBSTACLE : 74,
   UI : 100
 }
